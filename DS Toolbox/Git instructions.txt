@@ -1,0 +1,63 @@
+# Steps to commit and upload files in github
+https://www.coursera.org/learn/data-scientists-tools/discussions/weeks/2/threads/xDmwWMtdEeWOeA4jiPAy1w
+
+
+#Create a directory with same name of the repo you are going to copy on your local machine
+
+#Enter into that directory with cd ...
+
+
+##to make a copy of the current repo on github
+$ git remote add origin https://github.com/username/sample.git
+
+
+or alternatively, clone the repo to your computer:
+git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY
+
+##create files or move it manually on the working directory
+$ touch README.md
+
+
+##add them
+$ git add .
+
+
+##commit (you can change the name of the commit between virgolette)
+
+$ git commit -m "initial commit"
+
+
+
+## to push new content to the github repo (first time a popup will come up to request authentication)
+$ git push origin master
+
+
+
+#Assignment week 4:
+
+1. Create a repo named "datasciencecoursera" in Github
+
+Open Git Bash console
+
+2. Clone the "datasciencoursera" recently created in github
+   $ git remote add origin https://github.com/mcpasin/datasciencecoursera.git
+
+Make sure you are into the new directory "datasciencecoursera" using cd ..
+
+3. Create the HelloWorld.md file 
+   $ touch HelloWorld.md
+
+
+4. Edit the file in RStudio adding "## This is a markdown file" in the body
+
+5. Go back to Git bash and add the file
+   $ git add .
+
+
+6. Commit the change (you can change the name of the commit between virgolette)
+
+   $ git commit -m "initial commit"
+
+
+7. Push new content to the github repo (first time a popup will come up to request authentication)
+   $ git push origin master
