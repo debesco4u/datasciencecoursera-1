@@ -5,6 +5,8 @@ library(plyr)
 library(dplyr)
 
 #####READING AND EXPLORING FILES
+# you can use the folder "data_to_use_for_script" provided in this repo as working directory to source all files needed.
+# otherwise download and unzip the data from the provided URL and make sure you place all the necessary files in the same working directory.
 
 #Features
 features<- read.table("features.txt") # to be used for both X_train & X_test data
