@@ -1,0 +1,188 @@
+---
+title: "Effects of Weather Events on Public Health and the Economy. The US case."
+author: "Marco Pasin"
+date: "23 febbraio 2017"
+output: html_document
+---
+
+***
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+##SYNOPSIS
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many events can result in fatalities, injuries and property damage, and preventing such outcomes is a key concern for governments. The aim of this analysis is to explore the NOAA Storm Database in order to understand the impact of weather events in US public health and economy. To achieve it we have analysed, on one hand the number of fatalities and injuries for each event, and on the other the overall economic impact in terms of property and crop damage. The NOAA dataset is publicly available and covers data of weather events in the United States for the time period between 1950 and 2011. To perform the whole analysis we have used the R programming language.
+
+<br> 
+
+##DATA PROCESSING
+
+###Load libraries
+The following R libraries are required in order to perform the analysis.
+```{r,message=FALSE}
+library(R.utils) #to extract the NOAA archive.
+library(dplyr)   #to manipulate data.
+library(ggplot2)   #to plot data.
+```
+
+<br> 
+
+###Setting local directory & downloading files for the analysis
+The NOAA dataset is publcly available [here]("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"). It is possible to download it manually from the provided url or execute the R code below and download it in the correspondent working directory.
+```{r}
+#Set working directory for the analysis
+setwd("C:/Users/Marco/Dropbox/Coursera/Data Science Specialization - JHU/Reproducible Research/week4")
+
+#Download dataset, which is compressed via the bzip2 algorithm. Once downloaded we will use the bunzip2 function, from the R.utils library, to convert it to .csv
+if(!file.exists("storm_data.csv")) {  
+  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2","storm_data.csv.bz2")
+bunzip2("storm_data.csv.bz2", "storm_data.csv",overwrite=TRUE, remove=FALSE)
+}
+
+#Download related documentation for the data
+if(!file.exists("nsw_storm_sata_docuentation.pdf")) {  
+  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf","nsw_storm_sata_docuentation.pdf")
+}
+
+if(!file.exists("storm_events_faq.pdf")) {  
+  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf","storm_events_faq.pdf")
+}
+
+#Check that both data and documentation is available in local folder
+dir()
+```
+
+<br> 
+
+###Read the dataset and explore it
+With the code below we will import the dataset in the R environment. The dataset consists 902297 rows and 37 columns. Some of the variables are not ncessary for the goal of our analysis, hece we will drop them in next step. We can see that data has been collected for 985 distinct events.
+```{r}
+if(!exists("storm_data")) {  
+storm_data<-read.csv("storm_data.csv")
+}
+
+dim(storm_data)
+
+names(storm_data)
+head(storm_data)
+
+#There is a total of 985 distinct events in the dataset. 
+length(unique(storm_data$EVTYPE))
+```
+
+<br> 
+
+###Subset only necessary variables
+After reading documentation, we reckon that - for the purpose of this analysis -  we can reduce the size of the dataset by keeping just the necessary variables for our analysis.
+
+- To evaluate impact on public health we will be using the variables "FATALITIES" and "INJURIES".
+- To evaluate economic consecuences we will analyse Property and Crop damage using the following variables: "PROPDMG",    "PROPDMGEXP", "CROPDMG", "CROPDMGEXP".
+- To analyse climate event we will use the variable "EVTYPE". 
+
+Here below we subset our variables of interest.
+```{r}
+sub_storm_data<- storm_data %>%
+      select(EVTYPE,FATALITIES,INJURIES,PROPDMG:CROPDMGEXP)
+#Let also put column names in lower case.
+names(sub_storm_data)<-tolower(names(sub_storm_data))
+names(sub_storm_data)
+summary(sub_storm_data)
+sum(is.na(sub_storm_data))
+#The dataset does not present missing values, hece we can use the whole observations for our analysis.
+```
+
+<br> 
+
+###Clean property and crop variables
+As stated in documentation (page 12), variables that property and crop damages need to be transformed using the exponential variables "propdmgext" and "cropdmgexp", as follows:
+"Alphabetical characters used to signify magnitude include "K" for thousands, "M" for millions, and "B" for billions.
+
+First we check out possible values for the "exponential" variables and clean where necessary.
+```{r}
+unique(sub_storm_data$propdmgexp)
+unique(sub_storm_data$cropdmgexp)
+#We can see that there are also other values apart from the ones stated in documentation. Since we have no information about how to encode the unknown values, we will filter them out and keep just the ones explicitly reported on official documentation. That are "H","K","M","B".
+fil_sub_storm_data <- filter(sub_storm_data,sub_storm_data$propdmgexp %in% c("H","K","M","B") | sub_storm_data$cropdmgexp %in% c("H","K","M","B"))
+
+#Let now create two new variables to measure cost of property and crop, based on exponential values.
+exp<- c('H' = 100, 'K' = 1000, 'M' = 1000000, 'B' = 1000000000)
+fil_sub_storm_data$CropCost <- ifelse(toupper(fil_sub_storm_data$cropdmgexp) %in% names(exp), fil_sub_storm_data$cropdmg * exp[toupper(fil_sub_storm_data$cropdmgexp)], 0)
+
+fil_sub_storm_data$PropCost <- ifelse(toupper(fil_sub_storm_data$propdmgexp) %in% names(exp), fil_sub_storm_data$propdmg * exp[toupper(fil_sub_storm_data$propdmgexp)], 0)
+
+#Finally we sum up property nd crop cost to calculat the total economic impact. 
+fil_sub_storm_data <- fil_sub_storm_data %>% 
+      mutate(economic_impact= PropCost + CropCost)
+```
+
+To be consistent throughout the rest of the analysis, we will use the new dataset named "fil_sub_storm_data" to answer both questions about public health and economic impact of climate events.
+
+<br> 
+
+###Summarize the data by our variables of interest
+Below we sumarize fatalities, injuries and economic impact according to the type of event. We will use this summarized dataset to show results in the next section.
+```{r}
+summarized_df<-fil_sub_storm_data %>%
+      group_by(evtype) %>%
+            summarize(tot_fatalities=sum(fatalities),tot_injuries=sum(injuries),
+                      tot_economic_impact=sum(economic_impact))
+```
+
+<br>
+
+##RESULTS
+
+In the plots that follows, we show the **top 15 most severe events in the US** for:
+
+* Public health (in terms of both number of fatalities and injuries).
+* Economic impact (as previously explained we used the property and crop damage a main indicators).
+
+###Plot Fatalities
+```{r}
+plot_fatalities <- arrange(summarized_df,desc(tot_fatalities)) %>%
+      head(15) %>%
+            ggplot(aes(x=reorder(evtype,tot_fatalities), y=tot_fatalities)) +
+            geom_bar(fill="red",stat="identity")  + 
+            coord_flip() + 
+            ylab("Total number of fatalities") + xlab("Event") +
+            ggtitle("Most severe weather events for public health - fatalities") 
+
+plot_fatalities
+
+
+```
+
+###Plot injuries
+```{r}
+plot_injuries <- arrange(summarized_df,desc(tot_injuries)) %>%
+      head(15) %>%
+            ggplot(aes(x=reorder(evtype,tot_injuries), y=tot_injuries)) +
+            geom_bar(fill="orange",stat="identity")  + 
+            coord_flip() + 
+            ylab("Total number of injuries") + xlab("Event") +
+            ggtitle("Most severe weather events for public health - injuries") 
+plot_injuries 
+
+```
+
+###Plot economic impact
+```{r}
+plot_economic_impact <- arrange(summarized_df,desc(tot_economic_impact)) %>%
+      head(15) %>%
+            ggplot(aes(x=reorder(evtype,tot_economic_impact), y=tot_economic_impact)) +
+            geom_bar(fill="black",stat="identity")  + 
+            coord_flip() + 
+            ylab("Total economic impact $") + xlab("Event") +
+            ggtitle("Most severe weather events for the economy") 
+plot_economic_impact 
+```
+
+<br>
+
+**Tornado** is by far the most harmful weather event for population health both in terms of fatalities and injuries caused. 
+
+When we looked at the economic damage, results show that **flood** has the greatest economic consecuences on the US economy, followed by hurricane/typhoon and tornado.
+
+

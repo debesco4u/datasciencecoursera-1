@@ -1,0 +1,179 @@
+---
+title: <center> <h1>Prediction Assignment</h1>
+  </center>
+author: "<center> <h5>Marco Pasin - 30 July 2017</h5> </center>"
+subtitle: <center> <h4>Practical Machine Learning Course</h4> </center>
+output:
+  html_document:
+    toc: yes
+  html_notebook: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align="center")
+```
+
+```{r include=FALSE}
+setwd("C:/Users/Marco/Dropbox/Coursera/Data Science Specialization - JHU/Practical Machine Learning/week4")
+```
+
+***
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The goal is to **predict the manner in which they did the exercise**. This is the "classe" variable in the training set. We will first build a prediction model using a set of relevant features in the dataset provided and eventually use this model to predict 20 different test cases.
+
+***
+
+Load required libraries
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(caret)
+library(randomForest)
+library(rpart)
+```
+
+### Load the Data
+The training data for this project are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+
+We start by loading the training dataset which will be our focus for now.
+```{r}
+url_training<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+#note that we import both blank values and NA as NA values.
+training<- read.csv(url(url_training),na.strings = c("","NA"))
+dim(training)
+```
+The training set is composed of 19622 observations and 160 variables.
+
+*** 
+### Exploratory Analysis
+We explore the training dataset to see whether we need to perform some cleaning prior to train a prediction model.
+```{r eval=FALSE, warning=FALSE, message=FALSE}
+head(training)
+summary(training)
+sum(is.na(training))
+colSums(is.na(training))
+```
+
+####Remove unnecessary variables
+We are going to remove columns 1 to 7 since they are not useful variables to include in the prediction model. In fact they are mainly ids used to identify the specific observation (user name, timestamp, window,etc.).
+```{r}
+training<- training[,-(1:7)]
+```
+
+####Remove columns with missing values
+There are almost 2 million missing values in the dataset. Looking at NAs for each column we noticed that there are  either variables with no missing values at all or variables presenting 19216 NAs each. With the command below we can see that there is a total of 100 variables presenting NAs, so we are going to remove them.
+
+```{r}
+length(names(training[,colSums(is.na(training))>0])) #100 variables present NA's, actually 19216 NAs each
+missing<-names(training[,colSums(is.na(training))>0])
+training<-training[!names(training) %in% missing]
+```
+
+#### Check if there are variable with zero variance 
+We didn't find any variable with zero variance (one unique value across samples) or near zero variance, hence we don't need to make any further change to the dataset.
+```{r}
+nzVar <-nearZeroVar(training, saveMetrics=TRUE)
+table(nzVar$zeroVar)
+table(nzVar$nzv)
+```
+
+Eventually our final training dataset consists of **53 variables**. In the following section we are gooing to use this set of variables to build a prediction model. We can also the output variable "classe" how it loos like: A is the most common class representing 28% of total cases.+
+```{r}
+dim(training)
+table(training$classe)/nrow(training)
+```
+
+In the plot below we show correlation between each pair of variables in the dataset.Altough there seem to exist a couple of high correlations, we are not going to make further changes to the dataset. A possible approach would be performing a PCA (Principal Component Analysis) in order to summarize them and so reduce the number of predictors for the model. 
+```{r warning=FALSE, message=FALSE, fig.height=10, fig.width=10}
+cor_pair <- cor(training[,-53], use="pair")
+library(corrplot)
+corrplot(cor_pair)
+```
+
+
+### Model Building on training dataset
+
+Prior to build any model, we are going to subsplit the training dataset into two subsets:
+- a new training called n_training
+- a new testing called n_testing
+This split will allow us to perform **cross-validation**, so we can get an estimate of the out of sample error of the prediction before applying the model on the testing set.
+
+In R we can use the function `createDataPartition` available through the `caret` package to perform the split.
+```{r}
+#we first generate an index based on our output variable "classe" which splits 70%-30%
+set.seed(123)
+inTrain  <- createDataPartition(training$classe, p=0.7, list=FALSE)
+n_training<- training[inTrain, ]
+n_testing  <- training[-inTrain, ]
+dim(n_training)
+```
+The new training set on which we are going to build a prediction model is made of 13737 rows.
+
+
+
+#### Model 1: Random Forest
+We are going to build a random forest model on the new training set we just created with the subsplit and eventually estimate the out of sample error on the testing set. 
+
+We chose to start with Random Forest as:
+- it's a relatively simple model to implement
+- one of the most used algorithms for non-linear problems
+- good at overcoming overfitting problems of simple decision trees
+- often provide very accurate models for datasets with large number of features (RF is one of the most winning algorithms in Kaggle competitions).
+
+We are not going to perform cross-validation (e.g. k-fold cross-validation) since Random Forest already perform a similar process internally and already estimates the error internally during its execution (please refer to page 593 of the book [The Elements of Statistical Learning](https://web.stanford.edu/~hastie/Papers/ESLII.pdf)  for more details). . Also we noticed that performing cross-validation (and applying random forest via the `train()` function in R) we incurred in performance issues with our local machine.   
+```{r}
+set.seed(123)
+rf_mod<- randomForest(classe ~ ., data=n_training) 
+
+#Evaluation on n_testing
+predictions<- predict(rf_mod,newdata = n_testing)
+confusionMatrix(predictions,n_testing$classe) 
+#accuracy is 99% so the estimate of the error rate would be lower than 0.01
+```
+
+We can also look into the model to understand which variables are the most important for predicting the outcome: roll_belt appears to have far the highest impact.
+```{r}
+varImpPlot(rf_mod, sort=T, n.var=20, type=2, main="Variables importance")
+```
+
+
+#### Model 2: Classification Tree
+As an another model option, we also try to fit simple classification tree via the `rpart` algorithm in R, very used for classification problems.In this case we also perform cross-validation when training the model on the training data. However, after evaluating it on our testing set, it seems to be much less accurate that random forest. 
+```{r}
+set.seed(123)
+tc <- trainControl(method = "cv", number = 3, verboseIter=FALSE)
+tree <- train(classe ~ ., data = n_training, method = "rpart", trControl= tc)
+#evaluate the model on the testing set
+tree_pred<-predict(tree, newdata = n_testing)
+confusionMatrix(tree_pred, n_testing$classe)
+```
+
+Based mainly on the accuracy metric, we are going to **select Random Forest as best model** for predicting our final testing dataset below.
+
+### Prediction on testing dataset 
+
+####Load the testing set
+```{r}
+url_testing<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testing<- read.csv(url(url_testing),na.strings = c("","NA"))
+dim(testing)
+```
+The testing dataset have same number of variables as the datset on which we train our algorithm. But only 20 observations.
+
+####Apply RF model to predict 20 cases
+Below are our predicted classes for each of the 20 cases in the testing dataset.
+```{r}
+predict(rf_mod,testing)
+```
+
+After submitting the above predictions to the Quiz 4, it seems that they were all correct. In other words the accuracy of this model implemented via Random Forest was 100% when implemented on a new testing dataset.
+

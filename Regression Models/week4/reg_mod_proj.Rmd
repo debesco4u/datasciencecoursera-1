@@ -1,0 +1,167 @@
+---
+title: <center> <h1>Analysing the Effect of Transmission Type on Fuel Consumption</h1>
+  </center>
+author: "<center> <h5>Marco Pasin - 24 June 2017</h5> </center>"
+subtitle: <center> <h4>Regression Models Course Project</h4> </center>
+output:
+  html_document:
+    toc: yes
+  html_notebook: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.align="center")
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(knitr)
+```
+
+***
+### Executive Summary
+In this analysis we investigated the mtcars dataset, a collection of cars data extracted from the 1974 Motor Trend US magazine. In particular we were interested in answering the following two questions:
+
+- Is an automatic or manual transmission better for fuel consumption (MPG variable)?
+- Can we quantify the MPG difference between automatic and manual transmissions?
+
+We noticed a statistically significant difference between automatic and manual transmission: cars endowed with manual transmissions tend to have higher levels of MPG (miles per gallon). When bulding a simple linear model with the variable `am` as the only one predictor, manual transmission cars present about 7.2 miles per gallon more than automated transmission cars. However when we included other variables into our model, the effect of transmission seem to be much lower, and manual transmission get just around 2 miles per gallon more. We finally concluded that there are more important variables in the dataset that can help predicting fuel consumption, such as weight and gross horsepower instead focusing only on car transmission type. 
+
+***
+### Explore the dataset
+```{r}
+head(mtcars)
+```
+
+In the histogram below we can see how our outcome variable `mpg` it's distributed. Most of cars in the dataset have a `mpg` consumption between 15-20. Mean (red vertical line) is around 20 mpg.
+```{r fig.align="center", fig.width=5, fig.height=3}
+hist(mtcars$mpg, main = "Distribution of mpg")
+abline(v=mean(mtcars$mpg), col="red",lwd=2)
+```
+
+
+We can also visualize with a boxplot the relationship between transmission type and miles per gallon. Data about transmission are stored in the variable `am` where 0 indicates automatic transmission while 1 indicates that it is manual (in R type `?mtcars` for more details). 
+```{r fig.align="center", fig.width=5, fig.height=3}
+ggplot(mtcars, aes(x=factor(am),y=mpg)) + geom_boxplot() + 
+    ggtitle("MPG vs Transmission") +
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+**Cars with automated transmission seem to have lower levels of mpg**, that is a lower fuel efficiency than manual transmission cars do. However this pattern might happen by random chance, hence we have to perform a statistical test. To check if the two groups have different means we can use the *Student t-test*.
+
+We set the null hypothesis H0 as there is no difference between mps of manual and automatic transmission (no relationship between `mpg`~`am`). On the other hand, the alternative hypothesis H1 states that there is a relationship between transmission type and mpg.
+```{r}
+t.test(mpg~am,paired=FALSE,var.equal=TRUE,data=mtcars)
+```
+
+**The test looks statistically significant** since the p-value (the probability that the resulting difference between the two groups happened by chance) is much lower than 0.05, our alpha significance level.  Hence we can say that there is a statistically significant difference between automatic and manual transmission. Cars endowed with automatic transmissions tend to have lower levels of mpg (keeping other variables fixed).
+
+According to our 95% interval, we can be quite confident that the true difference in mpg is something between 3.6 and 10.8.
+
+###Simple Linear Regression Model
+On the basis of what we found earlier through the t-test, we can investigate the relationship between mpg and `am` further by fitting a simple linear regression model. This simple model will try to explain mpg (dependent variable) as a function of only `am` (independent variable or predictor).  
+This will allows also to quantify the MPG difference between automatic and manual transmission.
+```{r}
+fit1 <- lm(mpg ~ factor(am), data = mtcars)
+summary(fit1)
+```
+
+According to p-value, again the relationship seems to be statistically significant and the output shows that the average mpg for cars with manual transmission is about 7.2 mpg higher than automatic (the mean mpg for automatic transmission is 17.14). That's the difference we were looking to quantify.
+
+However the R squared value is 0.36 which means that **this simple model only explains only about 36% of the total variance in the data**. Modeling with just one predictor might not be sufficient to explaining our response variable. In the following section we will try to come up with a more complete model by including other important variables for predicting mpg. And quantify with more precision the mpg difference due to `am`.
+
+###Multivariable Linear Regression Model
+In order to identify other key variables that can explain mpg, a commong methodogy is to run a correlation test using the co.test function in R. 
+
+In the appendix we can see that the variables `wt`, `cyl`, `disp` and `hp` present the strongest correlation with mpg. Therefore it might make sense to try multivariable regression models including some of these variables.
+
+However, some of these potential predictors might be correlated among eahch others (i.e. **cofounders** in statistics). For example, it might be that cars with higher weight `wt` might have also higher volume `disp`. Or that cars that present higher weight `wt` it's because thay have a higher number of cylinders `cyl` (in the appendix we explored these relationships). It's important avoid including such cofounders in a regression model as they can compromise the stability of its estimates.
+
+The correlation matrix available in the appendix, shows in particular that weight is highly correlated with both the number of cylinders and displacement. Cylinders and displacement have strong correlations too. 
+
+Hence, we decided not to include `cyl` and `disp` variables in our multivariable model, but only `am`, `wt` and `hp` as follows:
+
+```{r}
+fit2<- lm(mpg~am + wt + hp, data = mtcars)
+```
+
+Since the simple linear model is **nested** into the multivariable (two models are considered nested when they both contain the same terms and one has at least one additional term, i.e. moel one is the reduced model and model 2 is the full model), we can use **Anova test** if there is a difference between them. In other words Anova will compare them and tell whether the full model contributes significant additional information for explaining our response variable.
+
+```{r}
+anova(fit1,fit2)
+```
+
+The p-value is very small, therefore we can state the full multivariable model is significantly different from previous simple model. Let's get a summary of it:
+
+```{r}
+summary(fit2)
+```
+The multivariable model explain 84% of total variance in `am` **variable has now a smaller effect on mpg**: its coefficient shows that, on average, cars with manual transmission have **only 2.08 `mpg`** more than automatic (it was around 7 in the simple model). 
+
+However we can also notice that the p-value for `am` is much larger than 0.05 so not significant. This means that transmission type is redundant with one or both the other predictors and provides no additional information for prediction. Therefore we believe it makes sense to **remove `am` from predictors**. A model containing only `wt` and `hp` as predictors should be more stable as we can notice from the below summary.
+```{r}
+best_fit<- lm(mpg ~ wt + hp, data = mtcars)
+summary(best_fit)
+```
+R squares is now 0.82: **this model explains around 82% of variation in the response variable mpg**. And both coefficients look statistical significant.
+
+
+###Residuals analysis
+Residuals represent the variation left unexplained by a model. Analysing them is very useful for diagnosing potential issues in the model like for istance heteroskedasticity.
+
+From the residual plot below we can see that points are randomly dispersed around the horizontal axis (no evidence of a pattern) which means that **our linear multivariable regression model seem to be appropriate for the data**.
+
+```{r fig.align="center", fig.width=5, fig.height=3}
+
+res<-ggplot(best_fit, aes(.fitted, .resid))+geom_point()
+res<-res+geom_hline(yintercept=0, col="red", linetype="dashed")
+res + xlab("fitted values") + ylab("residuals") + 
+    ggtitle ("Residuals analysis") +
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+###Appendix
+
+####Exploratory Analysis
+```{r}
+dim(mtcars)
+str(mtcars)
+```
+
+
+#### Correlation between variables
+Below we will perform the test for each variable in the dataset versus mpg, using a for loop.For each test we get both a correlation estimate and a p-value which again will tell us the probability of the relationship happening by chance (the smaller the p-value and more significant the correlation is).  
+
+The resulting tables reports variables sorted by their correlation (from higher to smaller in absolute values) and with the respective p-value.
+
+```{r}
+p<-2:11
+df_cor<-data.frame()
+for(i in p) {
+  cor<- cor.test(mtcars$mpg,mtcars[, i])
+  correlation<-cor$estimate
+  variable<-names(mtcars[i])
+  p_value<-cor$p.value
+  df_tmp<-data.frame(variable,correlation,p_value)
+  df_cor<-rbind(df_cor,df_tmp)
+  df_cor<-arrange(df_cor,desc(abs(correlation)))
+}
+
+kable(df_cor)
+```
+
+The code below shows how mpg is associated with some of the most correlated variables in the dataset.
+```{r fig.align="center", fig.width=6, fig.height=4}
+library(ggplot2)
+ggplot(mtcars, aes(x=wt,y=mpg, col=cyl, size=disp)) + geom_point() + 
+    ggtitle ("Relationship between mpg, weight, cylinders and displacement") +
+    theme(plot.title = element_text(hjust = 0.5))
+```
+
+Correlation matrix to spot cofounders.
+```{r}
+kable(cor(mtcars))
+```
+
