@@ -1,0 +1,177 @@
+---
+title: "proj2"
+author: "Marco Pasin"
+date: "26 January 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project Assignment 2 - Exploratory Data Analysis
+
+###Read files
+```{r}
+NEI <- readRDS("summarySCC_PM25.rds")
+SCC <- readRDS("Source_Classification_Code.rds")
+```
+
+
+
+1. Have total emissions from PM2.5 decreased in the United States from 1999 to 2008? Using the base plotting system, make a plot showing the total PM2.5 emission from all sources for each of the years 1999, 2002, 2005, and 2008.
+```{r}
+#Check if files exist, otherwise read them (make sure are in your working directory)
+if(!exists("NEI")){
+  NEI <- readRDS("summarySCC_PM25.rds")
+}
+if(!exists("SCC")){
+  SCC <- readRDS("Source_Classification_Code.rds")
+}
+
+totEmi<- tapply(NEI$Emissions, NEI$year, sum)
+#Create the plot
+png('plot1.png')
+barplot(totEmi, xlab = "year", ylab = "Total emissions from PM2.5", 
+        main = "Total Emissions per year",col = "grey")
+dev.off()
+```
+
+2. Have total emissions from PM2.5 decreased in the  Baltimore City, Maryland ( fips == 24510) from 1999 to 2008? Use the base plotting system to make a plot answering this question.
+```{r}
+#Check if files exist, otherwise read them (make sure are in your working directory)
+if(!exists("NEI")){
+  NEI <- readRDS("summarySCC_PM25.rds")
+}
+if(!exists("SCC")){
+  SCC <- readRDS("Source_Classification_Code.rds")
+}
+
+bal <- subset(NEI, fips == "24510")
+totEmiBal <- tapply(bal$Emissions, bal$year, sum)
+#Create the plot
+png('plot2.png')
+barplot(totEmiBal, xlab = "year", ylab = "Total emissions from PM2.5", main = "Total Emission per year in Baltimore",col = "grey")
+dev.off()
+```
+
+3. Of the four types of sources indicated by the type (point, nonpoint, onroad, nonroad) variable, which of these four sources have seen decreases in emissions from 1999-2008 for Baltimore City? Which have seen increases in emissions from 1999-2008? Use the ggplot2 plotting system to make a plot answer this question.
+```{r}
+#Check if files exist, otherwise read them (make sure are in your working directory)
+if(!exists("NEI")){
+  NEI <- readRDS("summarySCC_PM25.rds")
+}
+if(!exists("SCC")){
+  SCC <- readRDS("Source_Classification_Code.rds")
+}
+
+bal <- subset(NEI, fips == "24510")
+library(dplyr)
+library(ggplot2)
+EmiBalTyp<- bal%>%
+  select(Emissions,type,year) %>%
+  group_by(year,type) %>%
+  summarize(Emissions=sum(Emissions))
+EmiBalTyp$year<-as.factor(EmiBalTyp$year)
+#Create the plot
+png('plot3.png')
+g<-ggplot(EmiBalTyp,aes(year,Emissions))
+g+geom_bar(stat="identity")+facet_grid(.~type)+ggtitle("Total Emission per year in Baltimore by type of source")
+dev.off()
+```
+
+4. Across the United States, how have emissions from coal combustion-related sources changed from 1999-2008?
+```{r}
+#Check if files exist, otherwise read them (make sure are in your working directory)
+if(!exists("NEI")){
+  NEI <- readRDS("summarySCC_PM25.rds")
+}
+if(!exists("SCC")){
+  SCC <- readRDS("Source_Classification_Code.rds")
+}
+
+library(dplyr)
+library(ggplot2)
+EmiTot<- NEI%>%
+  select(SCC,Emissions,year) %>%
+  group_by(year,SCC) %>%
+  summarize(Emissions=sum(Emissions))
+#merge NEI with SCC dataset
+merged_df<-left_join(EmiTot,SCC,by="SCC")
+#identify coal combustion-related sources
+merged_df$comb_coal<-grepl("Comb",  as.character(merged_df$EI.Sector)) & grepl("Coal",  as.character(merged_df$EI.Sector))
+merged_df$year<-as.factor(merged_df$year)
+#Create the plot
+png('plot4.png')
+merged_df %>% 
+  filter(comb_coal==TRUE) %>%
+  ggplot(aes(year,Emissions)) +geom_bar(stat="identity")+ggtitle("Emission from coal combustion-related sources per year in US")
+dev.off()
+```
+
+5. How have emissions from motor vehicle sources changed from 1999-2008 in Baltimore City?
+```{r}
+#Check if files exist, otherwise read them (make sure are in your working directory)
+if(!exists("NEI")){
+  NEI <- readRDS("summarySCC_PM25.rds")
+}
+if(!exists("SCC")){
+  SCC <- readRDS("Source_Classification_Code.rds")
+}
+
+library(dplyr)
+library(ggplot2)
+EmiTot<- NEI%>%
+  filter(fips==24510) %>%
+  select(SCC,Emissions,year) %>%
+  group_by(year,SCC) %>%
+  summarize(Emissions=sum(Emissions))
+#merge NEI with SCC dataset
+merged_df<-left_join(EmiTot,SCC,by="SCC")
+#identify coal combustion-related sources
+merged_df$motor_veh<-grepl("Motor",  as.character(merged_df$Short.Name))
+merged_df$year<-as.factor(merged_df$year)
+#Create the plot
+png('plot5.png')
+merged_df %>% 
+  filter(motor_veh==TRUE) %>%
+  ggplot(aes(year,Emissions)) +geom_bar(stat="identity")+ggtitle("Emission from motor vechicle sources per year in US")
+dev.off()
+```
+
+
+6.Compare emissions from motor vehicle sources in Baltimore City with emissions from motor vehicle sources in Los Angeles County, California (fips == "06037"). Which city has seen greater changes over time in motor vehicle emissions?
+```{r}
+#Check if files exist, otherwise read them (make sure are in your working directory)
+if(!exists("NEI")){
+  NEI <- readRDS("summarySCC_PM25.rds")
+}
+if(!exists("SCC")){
+  SCC <- readRDS("Source_Classification_Code.rds")
+}
+
+library(dplyr)
+library(ggplot2)
+EmiTot<- NEI%>%
+  filter(fips=="24510" | fips == "06037") %>%
+  select(fips,SCC,Emissions,year) %>%
+  group_by(year,fips,SCC) %>%
+  summarize(Emissions=sum(Emissions))
+#merge NEI with SCC dataset
+merged_df<-left_join(EmiTot,SCC,by="SCC")
+#identify coal combustion-related sources
+merged_df$motor_veh<-grepl("Motor",  as.character(merged_df$Short.Name))
+merged_df$year<-as.factor(merged_df$year)
+#Create variable with proper names for states
+merged_df$state<-ifelse(merged_df$fips=="24510","Baltimore City","Los Angeles County, California")
+#Create the plot
+png('plot6.png')
+merged_df %>% 
+  filter(motor_veh==TRUE) %>%
+  ggplot(aes(year,Emissions))  +geom_bar(stat="identity",fill="darkseagreen")+facet_grid(.~state)+ggtitle("Emission from motor vechicle sources per year. Baltimore versus Los Angeles County, California" )
+
+dev.off()
+```
+
+
+

@@ -1,0 +1,59 @@
+---
+title: "Exploratory Data Analysis - Peer Assignment Week 1"
+author: "Marco Pasin"
+date: "08 gennaio 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Exploratory Data Analysis - Peer Assignment Week 1
+
+### Read file and keep just necessary rows
+```{r}
+setwd("C:/Users/Marco/Dropbox/Coursera/Data Science Specialization - JHU/Exploratory Data Analysis")
+
+houseConsumption<- read.table("household_power_consumption.txt",sep=";",header=TRUE)
+head(houseConsumption)
+str(houseConsumption)
+
+library(dplyr)
+houseConSub<- houseConsumption%>%
+                        filter(Date=="1/2/2007"|Date=="2/2/2007")
+summary(houseCon$Date)
+```
+
+### Convert to Date format and create new variable concatenating Date and Time
+```{r}
+houseConSub$Date<-as.Date(houseConSub$Date,"%d/%m/%Y")
+houseConSub<- houseConSub%>%
+                mutate(DateTime= as.POSIXct(paste(Date, Time)))
+```
+
+### Convert measure columns to numeric to be able to create plots later
+```{r}
+for(i in 3:9) {
+    houseConSub[,i]<-as.numeric(as.character((houseConSub[,i])))
+}
+```
+
+
+### Plot1
+```{r}
+hist(as.numeric(houseConSub$Global_active_power), col = "red", main = "Global Active Power",
+     xlab = "Global Active Power (killowatts)", ylab = "Frequency")
+```
+
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
