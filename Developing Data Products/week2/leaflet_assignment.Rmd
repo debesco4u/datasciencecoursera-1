@@ -1,0 +1,43 @@
+---
+title: "Leaflet assignment"
+date: "26 August 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+setwd("C:/Users/Marco/Dropbox/Coursera/Data Science Specialization - JHU/Developing Data Products/week2")
+places <- read.csv("my life places - places.csv")
+```
+
+***
+
+# Where I lived in a map
+##### click on circles to see how long I lived in each place
+```{r, echo=FALSE, warning=FALSE}
+library(leaflet)
+
+# text to be used in popup
+places$text_time <- ifelse(places$time_months<=12,
+                    paste(places$time_months,"months"),
+                    paste(places$time_year,"years"))
+
+# prepare color palette                
+rbPal <- colorRampPalette(c('#00ffff','#8000ff','red'))
+places$col <- rbPal(8)[as.numeric(cut(places$time_year,breaks = 8))]  
+
+# Map
+my_map <- leaflet(data=places) %>%
+  addTiles() %>%
+  addCircles( ~lng, ~lat,  
+              weight= ~sqrt(time_months)*1.5,
+              col= ~col,
+              popup = ~paste(toupper(city),"<br>", 
+                            "I lived here for", "", 
+                             text_time))
+
+my_map
+```
