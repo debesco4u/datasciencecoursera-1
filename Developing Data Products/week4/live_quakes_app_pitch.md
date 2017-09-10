@@ -10,7 +10,7 @@ App link:
 <br>
 Code:
 <br>
-<https://mcpasincoursera.shinyapps.io/live_earthquakes/>
+<https://github.com/mcpasin/datasciencecoursera/blob/master/Developing%20Data%20Products/week4/live_quakes_app/app.R>
 
 About the app
 ========================================================
