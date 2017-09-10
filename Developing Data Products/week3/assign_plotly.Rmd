@@ -1,0 +1,26 @@
+---
+title: "Developing Data Products - Week 3 Assignment"
+author: "Marco Pasin"
+date: "02 September 2017"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+setwd("C:/Users/Marco/Dropbox/Coursera/Data Science Specialization - JHU/Developing Data Products/week3")
+library(plotly)
+library(dplyr)
+dmd<- sample_n(diamonds,1000)
+```
+
+
+## Price vs carat of diamonds
+
+```{r, warning=FALSE, echo=FALSE, message=FALSE}
+plot_ly(dmd, x= ~carat, y= ~price, mode="markers",
+        color=~cut)
+```
+

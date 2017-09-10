@@ -1,0 +1,86 @@
+Live Earthquakes Shiny App
+========================================================
+author: Marco Pasin
+date: 10 September 2017
+autosize: true
+
+App link:
+<br>
+<https://mcpasincoursera.shinyapps.io/live_earthquakes/>
+<br>
+Code:
+<br>
+<https://mcpasincoursera.shinyapps.io/live_earthquakes/>
+
+About the app
+========================================================
+
+The app shows the latest earthquakes as reported by [USGS] (https://earthquake.usgs.gov/).  Data is "live" in the sense that a live connection to USGS is built within the app to make sure you get the most updated information. 
+
+- Places where earthquakes took place are plotted in a map and coloured according to their magnitude.
+- Tooltips provide additional information about the quake. Click circles to make it visible.
+- The 3 most recent earthquakes are shown in a separate table, plus additional stats are reported on the right sidebar.
+- I am not an expert in earthquakes. But I think it's an interesting use case for building a real-time data app :)
+
+Operations performed
+========================================================
+
+1. Retrieve the latest version of data available from USGS website. Data comes in a .csv file and reports quakes for the past 7 days (check the exact URL in the R code).
+2. Subset in case the user chooses to see only data from yesterday.
+3. Plot data on a map using *leaflet* library.
+4. Calculate a few stats like max and number of occurrences.
+5. Force a manual refresh of data if the user press the button "Update Data". 
+
+How I categorized magnitude
+========================================================
+
+```{r, echo=FALSE, warning=FALSE, hide=TRUE }
+library(leaflet)
+url <- ("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.csv")
+df <- read.csv(url)
+
+    
+    # Categorize magnitude in terms of size
+    df$size <- cut(df$mag,breaks = c(-1, 3.9, 4.9, 5.9, 6.9, 7.9, 12),
+                   labels=c("minor", "light", "moderate", "strong", "major", "great 8+"))
+    
+    # Create colour pallet
+    col_rainbow<- c("#66ffff","#1aff1a","#f07900","#ff0000","#b30000","#b30059")
+    pallet <- colorFactor(col_rainbow, df$size)
+    
+    # Create popup in HTML
+    pop <- paste(
+                  "<b>Place:</b>", df$place, "<br>",
+                  "<b>Time:</b>", df$time, "<br>",   # should make it nicer format
+                  "<b>Mag:</b>", as.character(df$mag), "<br>",
+                  "<b>Depth:</b>", as.character(df$depth), "km<br>"
+                )
+```
+
+```{r }
+# Categorize magnitude in terms of size
+
+## Great	8 or more
+## Major	7 to 7.9
+## Strong	6 to 6.9
+## Moderate	5 to 5.9
+## Light	4 to 4.9
+## Minor	up to 3.9
+
+df$size <- cut(df$mag,breaks = c(-1, 3.9, 4.9, 5.9, 6.9, 7.9, 12), labels=c("minor", "light", "moderate", "strong", "major", "great 8+"))
+```
+
+A snapshot of the data
+========================================================
+<br>
+Example of 5 most recent earthquakes reported
+```{r, echo=FALSE, warning=FALSE}
+library(dplyr)
+library(knitr)
+
+last5 <- df
+last5 <- select(last5, time, place, magnitude= mag, depth,
+                    type)  #miss size
+last5 <- last5[1:5,]
+kable(last5)
+```
