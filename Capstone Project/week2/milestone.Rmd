@@ -1,0 +1,287 @@
+---
+title: <center> <h1>Capstone Project - Milestone Report</h1>
+  </center>
+author: "<center> <h5>Marco Pasin - 29 October 2017</h5> </center>"
+subtitle: <center> <h4> JHU Data Science Specialization</h4> </center>
+output:
+  html_document:
+    toc: yes
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+library(knitr)
+```
+
+
+***
+
+### Introduction to the tasks
+
+The capstone project scope is to design an application able to predict next word(s) based on a incomplete sentence typed by the user. A corpora of three files with text data from twitter, blog and news were provided and will be used to create the prediction model. The application will be developed in R using Shiny package.
+
+The two main tasks of this milestone report are:
+
+* Performing an exploratory analysis of the corpora provided, understand the distribution of words and relationship between them.
+
+* Briefly summarize plans for creating the prediction algorithm and Shiny app.
+
+
+<br>
+
+### Load corpora text files
+
+The corpora are collected from publicly available sources by a web crawler. The crawler checks for language, so as to mainly get texts consisting of the desired language.
+
+We are only loading texts in English language. 
+```{r, warning=FALSE, eval=FALSE}
+path <- ("C:/Users/Marco/Documents/ds_specialization_github/datasciencecoursera/Capstone Project/swiftkey_data/en_US/")
+blogs <- readLines(paste0(path,"en_US.blogs.txt"), encoding = "UTF-8")
+news <- readLines(paste0(path,"en_US.news.txt"), encoding = "UTF-8")
+twitter <- readLines(paste0(path,"en_US.twitter.txt"), encoding = "UTF-8")
+```
+
+<br>
+
+### Sampling
+
+Given the big size of datasets, we are going to take a sample for each of them. The idea is to have a **smaller and representative subset** on which we can perform qicker analysis and build statistical models eventually.
+
+We are going to take 15% of data for each dataset.
+```{r, eval=FALSE, warning=FALSE}
+sample_2_per <- function (x) {sample(x , length(x)*0.02, replace = F)}
+set.seed(15)
+blogs_s <- sample_2_per(blogs)
+news_s <- sample_2_per(news)
+twitter_s <- sample_2_per(twitter)
+
+# We can remove original text files loaded into R to free up memory
+library(pryr)
+mem_used()
+rm(blogs, news, twitter)
+mem_used()   # we have much more free memory now
+```
+<br>
+
+### Initial cleaning: remove non-ASCII character
+First of all we are going to remove non-ASCII characters e.g. symbols, emoticons, etc. which are often present in social networks messages.
+```{r, eval=FALSE, warning=FALSE}
+# create a function to convert to ascii
+conv_to_ascii <- function(x) {
+  to_ascii <- iconv(x, "latin1", "ASCII", sub="")
+  return(to_ascii)
+}
+
+blogs_s <- conv_to_ascii(blogs_s)
+news_s <- conv_to_ascii(news_s)
+twitter_s <- conv_to_ascii(twitter_s)
+
+# also remove hashtags and mentions from twitter text
+twitter_s <- gsub("@\\w+ *", "", twitter_s)
+twitter_s <- gsub("#\\w+ *", "", twitter_s)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+load("C:/Users/Marco/Desktop/capstone_samples.RData")
+```
+
+<br>
+
+### Combine the 3 samples in one dataset
+```{r, warning=FALSE, message=FALSE}
+all_samples <- c(blogs_s, news_s, twitter_s)
+```
+
+<br>
+
+### Load text mining libraries
+
+After several attempts using `tm` and `RWeka`, due mainly to performance issues, I have decided to explore `**quanteda**` library.
+
+I am also going to make use of the recently built `tidytext` library to generate some visualizations.
+
+```{r, warning=FALSE, message=FALSE}
+library("quanteda")
+library("tidytext")
+```
+
+<br>
+
+### Create a Corpus
+```{r, warning=FALSE, message=FALSE}
+my_corpus <- corpus(all_samples)
+
+summary(my_corpus, 3)
+
+# or to extract for example just the 2nd text of the corpus:
+# texts(my_corpus)[2]
+```
+For example the 3rd text is composed of 6 sentences and a total number of 126 tokens.
+
+<br>
+
+### Cleaning the data
+
+I am creating a sparse document-feature matrix and apply the following cleaning operations:
+
+- convert everything to **lower case** for consistency.
+- **stemming** to reduce inflectional forms and derivated forms to their root or "stem" form (e.g. organize, organizes, and organizing; democracy, democratic, democratization).
+- remove **stopwords**
+- remove **profanity words**
+
+```{r, warning=FALSE, message=FALSE}
+profanity <- read.table("swearWords.csv", sep=",")
+
+my_corpus_cleaned <- dfm(all_samples, tolower = T, 
+                         stem = T, remove_punct=T,remove_numbers=T,
+                         remove = c(stopwords("english"), profanity), 
+                         dictionary = NULL, verbose=TRUE
+                         )
+```
+
+<br>
+
+### Identify most frequent words
+```{r, warning=FALSE, message=FALSE}
+top_words <- topfeatures(my_corpus_cleaned, 50)
+```
+
+Plotting text dataset as a worldcloud. Size of words are proportional to their frequency. 
+```{r, warning=FALSE, message=FALSE}
+textplot_wordcloud(my_corpus_cleaned, min.freq = 200, random.order = FALSE,
+                   rot.per = .25, colors = RColorBrewer::brewer.pal(8,"Dark2"))
+```
+
+<br>
+
+### How many unique words do we need to cover 50% and 90% of all document?
+Please note I am doing this analysis using the combined sample created previously wich include only a 2% subset of the original data.
+
+From the cleaned corpus generated above I know there is a total of 50713 features inside. 
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+all_features <- topfeatures(my_corpus_cleaned, 50713)
+all_features <- as.data.frame(all_features) %>% rename (freq= all_features)
+
+all_features <- all_features %>% 
+                  mutate(word=row.names(all_features), total=sum(freq), 
+                  per=freq/total, cum=cumsum(per)) %>%
+                  select (word, freq, cum)
+
+cum50 <- which(all_features$cum >= 0.5)[1]
+cum50 / 50713
+```
+
+We se that with just 525 words (that corresponds to 1% of total words present in the document) we can build 50% of the entire document. 
+
+```{r, warning=FALSE, message=FALSE}
+cum90 <- which(all_features$cum >= 0.9)[1]
+cum90 / 50713
+```
+
+On the other hand **we need 7550 words (14% of total words) to build 90% of the document**. This is a very important point to consider when building the prediction algorithm: it might not be necessary to keep the entire corpus to provide accurate predictions for next words.
+
+*Additional analysis*: it would be interesting to break down this analysis for **blogs vs news vs twitter** to see if for example the % of unique words needed is even lower for twitter compared to blogs or news (hypothesis: social networds have more restricted vocabulary while news might present a much richer vocabulary).
+
+
+### Create ngrams
+To understand relationships between words I am creatin several grams. Grams are sequences of words that are found inside wider sequences of words. I'll be creating bigrams (2 words sequences), trigrams (3 words) and fougrams (4 words).
+
+In `quanteda` I can still use the `dfm()` function and use the argument `ngrams` to specify the number of words in the sequence.
+```{r, warning=FALSE, message=FALSE}
+# Create a function since the only parameter I might have to change is the number of grams
+create_gram <- function (x, n) {
+  gram <- dfm(x, ngrams=n, concatenator=" ", tolower = T, 
+            stem = T,  remove_punct=T,  remove_numbers=T,
+            remove = stopwords("english"), dictionary = NULL, verbose=TRUE)
+  return(gram)
+}
+
+bigrams <- create_gram(my_corpus, 2)
+trigrams <- create_gram(my_corpus, 3)
+fourgrams <- create_gram(my_corpus, 4)
+```
+
+### Most frequent bigrams
+```{r, warning=FALSE, message=FALSE}
+top10_bigrams <- topfeatures(bigrams, 10)
+kable(as.data.frame(top10_bigrams))
+
+textplot_wordcloud(bigrams, min.freq = 200, random.order = FALSE,
+                   rot.per = .25, colors = RColorBrewer::brewer.pal(8,"Dark2"))
+```
+
+
+We can also visualize network of bigrams and understand all the relationships between words simultaneously.  To make the visualization we will use the ggraph package as suggested in the book [Text Mining with R](http://tidytextmining.com/ngrams.html#visualizing-a-network-of-bigrams-with-ggraph).
+
+First I need to get data into a tidy format (data frame where each word is a column)
+```{r, warning=FALSE, mesage=FALSE}
+library(tidyr)
+top100_bigrams <- topfeatures(bigrams, 100)
+test <- as.data.frame(top100_bigrams)
+bigrams_tidy <- data.frame(row.names(test), test$top100_bigrams)
+names(bigrams_tidy) <- c("words", "freq")
+bigrams_tidy <- separate(bigrams_tidy, words, into = c("word1", "word2"), sep = " ")
+kable(head(bigrams_tidy))
+```
+
+Now we can build the network viz (I am plotting just the top 100 bigrams).
+```{r, warning=FALSE, message=FALSE}
+library(igraph)
+library(ggraph)
+
+bigram_graph <- bigrams_tidy %>%
+  graph_from_data_frame()
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(show.legend = FALSE,arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
+
+As we might expected, the network shows that words like "I", "you", "to", "the" represent key node around which sentences are built upon.  
+
+<br>
+
+### Most frequent trigrams
+```{r, warning=FALSE, message=FALSE}
+top10_trigrams <- topfeatures(trigrams, 10)
+kable(as.data.frame(top10_trigrams))
+textplot_wordcloud(trigrams, min.freq = 50, random.order = FALSE,
+                   rot.per = .25, colors = RColorBrewer::brewer.pal(8,"Dark2"))
+```
+
+<br>
+
+### Most frequent fourgrams
+```{r, warning=FALSE, message=FALSE}
+top10_fourgrams <- topfeatures(fourgrams, 10)
+kable(as.data.frame(top10_fourgrams))
+textplot_wordcloud(fourgrams, min.freq = 30, random.order = FALSE,
+                   rot.per = .25, colors = RColorBrewer::brewer.pal(8,"Dark2"))
+```
+
+<br>
+
+
+### Plan for prediction algorithm
+
+1. Data preparation and ngrams creation will be done outside the app, for performance reasons (might do further cleaning as profanity filter doesn't work properly).
+2. Given that 14% of unique words cover over 90% of the document, we will probably keep only ngrams with a specified minimum frequency.
+3. Load ngrams text files.
+4. User inputs a word. Whenever he clicks on submit (or enter) the input will be read.
+5. Prediction algorithm takes the input and will output next word(s) prediction to the user (TBC how many words to show).
+6. The user might choose how many next words to have predicted (e.g. 1 to 3 max)
+5. Algorithm steps: I might use the Katz backoff algorithm to make the predictions. The steps could be as follows: 
+  + search first within the fourgrams file and show the most probable match (look for last 3 words typed by the user). 
+  + if no match is found, back off to trigrams (look for last 2 words typed by the user);
+  + if not match is found, back off to bigrams (look for last word typed by the user);
+  + if not match is found, back off to one gram (return word(s) with highest frequency).

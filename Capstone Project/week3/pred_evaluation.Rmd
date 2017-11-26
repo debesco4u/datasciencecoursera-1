@@ -1,0 +1,27 @@
+---
+title: "Prediction Model Evaluation - Next Word Predictor"
+author: "Marco Pasin"
+date: "11 november 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Issues in current model
+
+- sometimes too specific for long sentences if a case is found in fivegrams (could be a case with only few observations)
+- just taking the first most frequent word in the ngram
+- heavy weight of ngrams (especially if fivegram is used). Shinyapps has upload limits?
+
+
+## Improvements
+
+- Remove fivegrams would make:
+  - less objects to upload to shinyapps.io
+  - searching process quicker
+  - higher ngram models might generate overfitting (predictions too tied to sample text available)
+  - offer more than one word to choose from
+  - calculate probability of each next word instead of simply taking the most frequent one
+  - measure accuracy over test dataset (I didn't split between training/test)

@@ -1,0 +1,116 @@
+---
+title: "Capstone Project"
+author: "Marco Pasin"
+date: "05 Oct 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Task 0: Understanding the problem 
+
+*Questions to consider:*
+
+- *What do the data look like?*
+- *Where do the data come from?*
+- *Can you think of any other data sources that might help you in this project?*
+- *What are the common steps in natural language processing?*
+- *What are some common issues in the analysis of text data?*
+- *What is the relationship between NLP and the concepts you have learned in the Specialization?*
+
+
+### Load text files
+
+The corpora are collected from publicly available sources by a web crawler. The crawler checks for language, so as to mainly get texts consisting of the desired language.
+
+We are only loading texts in English language. 
+```{r}
+path <- ("C:/Users/Marco/Documents/ds_specialization_github/datasciencecoursera/Capstone Project/swiftkey_data/en_US/")
+blogs <- readLines(paste0(path,"en_US.blogs.txt"), encoding = "UTF-8")
+news <- readLines(paste0(path,"en_US.news.txt"), encoding = "UTF-8")
+twitter <- readLines(paste0(path,"en_US.twitter.txt"), encoding = "UTF-8")
+```
+
+Quick look into each dataset
+```{r}
+head(blogs,3)
+head(news,3)
+head(twitter,3)
+```
+
+
+### Let's answer to Quiz 1 questions
+
+1) The en_US.blogs.txt  file is how many megabytes?
+As shown above blogs file is almost 250Mb large.
+
+Twitter and blogs files look pretty large. How much does each dataset weight (in MB)?
+```{r}
+weight <- function (x) {format(object.size(x), units="MB")}
+weight(blogs)
+weight(news)
+weight(twitter)
+```
+
+
+2) The en_US.twitter.txt has how many lines of text?
+
+Let's get a summary.
+```{r}
+sapply(list(blogs, news, twitter), function(x) summary(x))
+```
+
+Twitter dataset is over 2 million lines of text.
+
+
+3) What is the length of the longest line seen in any of the three en_US data sets?
+
+For each dataset line, I calculate how many character the line is composed of.
+```{r}
+sapply(list(blogs, news, twitter), function(x) max(nchar(x)))
+```
+The blog dataset has the longest line with over 40 thousand characters.
+
+4) In the en_US twitter data set, if you divide the number of lines where the word "love" (all lowercase) occurs by the number of lines the word "hate" (all lowercase) occurs, about what do you get?
+
+```{r}
+love_twitter <- length(grep("love", twitter))
+hate_twitter <- length(grep("hate", twitter))
+love_twitter/hate_twitter
+```
+Luckily there's still more love than hate in the twitter world :) . Love is present 4 times more than hate.
+
+
+5) The one tweet in the en_US twitter data set that matches the word "biostats" says what?
+
+```{r}
+twitter[grep("biostats", twitter)]
+
+```
+It says that they haven't studied for their biostats exam.
+
+
+6) How many tweets have the exact characters "A computer once beat me at chess, but it was no match for me at kickboxing". (I.e. the line matches those characters exactly.)
+
+```{r}
+tweets_with_sentence <- grep("A computer once beat me at chess, but it was no match for me at kickboxing",twitter)
+length(tweets_with_sentence)
+```
+
+There are only 3 tweets with exaclty that sentence.
+
+
+
+```{r}
+t1grams   <- NGramTokenizer( corpus,  Weka_control(min = 1, max = 1)) 
+```
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
