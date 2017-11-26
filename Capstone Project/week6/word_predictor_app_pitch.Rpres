@@ -26,6 +26,9 @@ Although this is only a proof of concept, the idea is to emulate other more soph
 tex typed:  **I have to**
 <br>
 prediction:  **go**</small>
+<br>
+<br>
+<small>*Please note the app works with only english language*</small>
 
 
 Operations performed
